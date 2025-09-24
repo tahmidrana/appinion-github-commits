@@ -14,13 +14,12 @@ export default defineEventHandler(async (event) => {
     'User-Agent': 'Nuxt-GitHub-App'
   }
 
-  // 1. Get all repos in the org
+  // Get all repos in the org
   const reposRes = await fetch(`https://api.github.com/orgs/${org}/repos?per_page=100`, { headers })
   const repos = await reposRes.json()
 
   let commitsByUser: Record<string, any[]> = {}
 
-  // 2. Loop repos and get commits
   for (const repo of repos) {
     const commitsRes = await fetch(
       `https://api.github.com/repos/${org}/${repo.name}/commits?since=${from}T00:00:00Z&until=${to}T23:59:59Z&per_page=100`,
@@ -36,6 +35,8 @@ export default defineEventHandler(async (event) => {
       commitsByUser[author].push({
         hash: commit.sha.substring(0, 7),
         message: commit.commit.message,
+        date: commit.commit.author.date,
+        project: repo.name,
         url: commit.html_url
       })
     }
