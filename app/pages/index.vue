@@ -40,6 +40,15 @@
               <span v-if="loading" class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               {{ loading ? 'Loading' : 'Load commits' }}
             </button>
+
+            <button
+              type="button"
+              class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="loading || cacheEntryCount === 0"
+              @click="clearCache"
+            >
+              Clear cache
+            </button>
           </div>
         </div>
 
@@ -56,6 +65,11 @@
             <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Repositories</p>
             <p class="mt-1 text-lg font-semibold text-slate-950">{{ stats.projects }}</p>
           </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
+          <p>{{ cacheStatus }}</p>
+          <p>{{ cacheEntryCount }} cached {{ cacheEntryCount === 1 ? 'month' : 'months' }}</p>
         </div>
       </section>
 
@@ -156,9 +170,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const pad = (value) => `${value}`.padStart(2, '0')
+const CACHE_PREFIX = 'github-commits-cache:v1:'
 
 const currentDate = new Date()
 const selectedMonth = ref(`${currentDate.getFullYear()}-${pad(currentDate.getMonth() + 1)}`)
@@ -168,6 +183,8 @@ const selectedUser = ref('')
 const errorMessage = ref('')
 const hasSearched = ref(false)
 const openAuthors = ref([])
+const cacheStatus = ref('No cached data loaded yet.')
+const cacheEntryCount = ref(0)
 
 const monthRange = computed(() => {
   if (!selectedMonth.value) {
@@ -184,15 +201,59 @@ const monthRange = computed(() => {
   }
 })
 
+const getCacheKey = (month) => `${CACHE_PREFIX}${month}`
+
+const refreshCacheCount = () => {
+  if (!import.meta.client) return
+  cacheEntryCount.value = Object.keys(localStorage).filter((key) => key.startsWith(CACHE_PREFIX)).length
+}
+
+const applyCommits = (payload, source) => {
+  commitsData.value = payload || {}
+  selectedUser.value = ''
+
+  const users = Object.keys(commitsData.value).sort()
+  openAuthors.value = users.length ? [users[0]] : []
+  cacheStatus.value = source
+}
+
+const readCachedCommits = (month) => {
+  if (!import.meta.client) return null
+
+  const cached = localStorage.getItem(getCacheKey(month))
+  if (!cached) return null
+
+  try {
+    return JSON.parse(cached)
+  } catch {
+    localStorage.removeItem(getCacheKey(month))
+    refreshCacheCount()
+    return null
+  }
+}
+
+const writeCachedCommits = (month, payload) => {
+  if (!import.meta.client) return
+  localStorage.setItem(getCacheKey(month), JSON.stringify(payload))
+  refreshCacheCount()
+}
+
 const fetchCommits = async () => {
   if (!monthRange.value.from || !monthRange.value.to) {
     errorMessage.value = 'Please select a month.'
     return
   }
 
-  loading.value = true
   errorMessage.value = ''
   hasSearched.value = true
+
+  const cachedPayload = readCachedCommits(selectedMonth.value)
+  if (cachedPayload) {
+    applyCommits(cachedPayload, `Showing cached results for ${monthLabel.value}.`)
+    return
+  }
+
+  loading.value = true
 
   try {
     const { data, error } = await useFetch('/api/commits', {
@@ -208,13 +269,13 @@ const fetchCommits = async () => {
       throw new Error(payload.error)
     }
 
-    commitsData.value = payload || {}
-    selectedUser.value = ''
-    openAuthors.value = sortedUsers.value.length ? [sortedUsers.value[0]] : []
+    applyCommits(payload, `Showing live results for ${monthLabel.value}.`)
+    writeCachedCommits(selectedMonth.value, payload || {})
   } catch (error) {
     commitsData.value = {}
     errorMessage.value = error instanceof Error ? error.message : 'An unexpected error occurred.'
     openAuthors.value = []
+    cacheStatus.value = 'No cached data loaded yet.'
   } finally {
     loading.value = false
   }
@@ -268,4 +329,19 @@ const toggleAuthor = (user) => {
 
   openAuthors.value = [...openAuthors.value, user]
 }
+
+const clearCache = () => {
+  if (!import.meta.client) return
+
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(CACHE_PREFIX))
+    .forEach((key) => localStorage.removeItem(key))
+
+  refreshCacheCount()
+  cacheStatus.value = 'Cache cleared.'
+}
+
+onMounted(() => {
+  refreshCacheCount()
+})
 </script>
