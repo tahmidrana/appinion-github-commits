@@ -114,13 +114,12 @@
             class="overflow-hidden rounded-2xl border shadow-sm"
             :class="getAuthorCardClass(user)"
           >
-            <button
-              type="button"
-              class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition"
-              :class="getAuthorHoverClass(user)"
-              @click="toggleAuthor(user)"
-            >
-              <div class="min-w-0">
+            <div class="flex items-center gap-3 px-4 py-3" :class="getAuthorHoverClass(user)">
+              <button
+                type="button"
+                class="min-w-0 flex-1 text-left"
+                @click="toggleAuthor(user)"
+              >
                 <div class="flex flex-wrap items-center gap-2">
                   <span
                     class="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-semibold"
@@ -138,20 +137,83 @@
                   </span>
                 </div>
                 <p class="text-xs text-slate-500">{{ commits.length }} {{ commits.length === 1 ? 'commit' : 'commits' }}</p>
+              </button>
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
+                  :aria-label="`Toggle analytics for ${user}`"
+                  @click.stop="toggleAnalytics(user)"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                    <path d="M3 16.25A1.25 1.25 0 0 1 4.25 15h11.5a.75.75 0 0 1 0 1.5H4.25A1.25 1.25 0 0 1 3 16.25Zm1-3.5A1.25 1.25 0 0 1 5.25 11.5h1.5A1.25 1.25 0 0 1 8 12.75v2a.75.75 0 0 1-1.5 0V13H5.5v1.75a.75.75 0 0 1-1.5 0v-2Zm4.75-4A1.25 1.25 0 0 1 10 7.5h1.5a1.25 1.25 0 0 1 1.25 1.25v6a.75.75 0 0 1-1.5 0V9H10.25v5.75a.75.75 0 0 1-1.5 0v-6Zm4.75-3A1.25 1.25 0 0 1 14.75 4.5h1.5a1.25 1.25 0 0 1 1.25 1.25v9a.75.75 0 0 1-1.5 0V6H15v8.75a.75.75 0 0 1-1.5 0v-9Z" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-transform"
+                  :class="isAuthorOpen(user) ? 'rotate-180' : ''"
+                  :aria-label="`Toggle commits for ${user}`"
+                  @click="toggleAuthor(user)"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                    <path
+                      fill-rule="evenodd"
+                      d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
               </div>
-              <span
-                class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-transform"
-                :class="isAuthorOpen(user) ? 'rotate-180' : ''"
-              >
-                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                  <path
-                    fill-rule="evenodd"
-                    d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.51a.75.75 0 0 1-1.08 0l-4.25-4.51a.75.75 0 0 1 .02-1.06Z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </span>
-            </button>
+            </div>
+
+            <div
+              v-if="isAnalyticsOpen(user)"
+              class="grid gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-600 sm:grid-cols-5"
+            >
+              <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-slate-500">Commits</p>
+                <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).commits }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-slate-500">Projects</p>
+                <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).projects }}</p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-slate-500">Lines added</p>
+                <button
+                  v-if="!authorStats[user] && !isStatsLoading(user)"
+                  class="mt-1 text-sm font-semibold text-sky-600 hover:text-sky-800"
+                  @click.stop="fetchAuthorStats(user)"
+                >
+                  View
+                </button>
+                <p v-else class="mt-1 text-sm font-semibold text-emerald-600">
+                  <span v-if="isStatsLoading(user)" class="inline-block h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-slate-600" />
+                  <span v-else>{{ getAuthorAnalytics(user).additions }}</span>
+                </p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-slate-500">Lines deleted</p>
+                <button
+                  v-if="!authorStats[user] && !isStatsLoading(user)"
+                  class="mt-1 text-sm font-semibold text-sky-600 hover:text-sky-800"
+                  @click.stop="fetchAuthorStats(user)"
+                >
+                  View
+                </button>
+                <p v-else class="mt-1 text-sm font-semibold text-rose-600">
+                  <span v-if="isStatsLoading(user)" class="inline-block h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-slate-600" />
+                  <span v-else>{{ getAuthorAnalytics(user).deletions }}</span>
+                </p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p class="text-[11px] uppercase tracking-wide text-slate-500">Latest commit</p>
+                <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).latestCommit }}</p>
+              </div>
+            </div>
 
             <div v-if="isAuthorOpen(user)" class="border-t border-slate-200 bg-white/95 px-4 py-3">
               <ul class="space-y-2">
@@ -206,6 +268,9 @@ const authorSearch = ref('')
 const errorMessage = ref('')
 const hasSearched = ref(false)
 const openAuthors = ref([])
+const analyticsAuthors = ref([])
+const authorStats = ref({})
+const statsLoading = ref([])
 const cacheStatus = ref('No cached data loaded yet.')
 const cacheEntryCount = ref(0)
 
@@ -240,7 +305,9 @@ const applyCommits = (payload, source) => {
     const commitDiff = (commitsData.value[right]?.length || 0) - (commitsData.value[left]?.length || 0)
     return commitDiff || left.localeCompare(right)
   })
-  openAuthors.value = users.length ? [users[0]] : []
+  openAuthors.value = []
+  analyticsAuthors.value = []
+  authorStats.value = {}
   cacheStatus.value = source
 }
 
@@ -302,6 +369,8 @@ const fetchCommits = async () => {
     commitsData.value = {}
     errorMessage.value = error instanceof Error ? error.message : 'An unexpected error occurred.'
     openAuthors.value = []
+    analyticsAuthors.value = []
+    authorStats.value = {}
     cacheStatus.value = 'No cached data loaded yet.'
   } finally {
     loading.value = false
@@ -365,6 +434,24 @@ const formatDate = (isoString) => {
   })
 }
 
+const getAuthorAnalytics = (user) => {
+  const commits = commitsData.value[user] || []
+  const latestCommit = commits.reduce((latest, commit) => {
+    if (!latest) return commit
+    return new Date(commit.date) > new Date(latest.date) ? commit : latest
+  }, null)
+
+  const stats = authorStats.value[user] || {}
+
+  return {
+    commits: commits.length,
+    projects: new Set(commits.map((commit) => commit.project)).size,
+    additions: stats.additions || 0,
+    deletions: stats.deletions || 0,
+    latestCommit: latestCommit ? formatDate(latestCommit.date) : 'No activity'
+  }
+}
+
 const getAuthorRank = (user) => rankedUsers.value.indexOf(user) + 1
 
 const getAuthorBadgeLabel = (user) => {
@@ -417,6 +504,57 @@ const toggleAuthor = (user) => {
 
   openAuthors.value = [...openAuthors.value, user]
 }
+
+const isAnalyticsOpen = (user) => analyticsAuthors.value.includes(user)
+
+const fetchAuthorStats = async (user) => {
+  if (authorStats.value[user] || statsLoading.value.includes(user)) return
+
+  statsLoading.value = [...statsLoading.value, user]
+
+  try {
+    const { data } = await useFetch('/api/commit-stats', {
+      method: 'POST',
+      body: {
+        commits: commitsData.value[user] || []
+      }
+    })
+
+    if (data.value && !data.value.error) {
+      const stats = data.value
+      let totalAdditions = 0
+      let totalDeletions = 0
+
+      for (const commit of commitsData.value[user] || []) {
+        const key = `${commit.project}-${commit.hash}`
+        if (stats[key]) {
+          totalAdditions += stats[key].additions || 0
+          totalDeletions += stats[key].deletions || 0
+        }
+      }
+
+      authorStats.value[user] = {
+        additions: totalAdditions,
+        deletions: totalDeletions
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch author stats:', e)
+  } finally {
+    statsLoading.value = statsLoading.value.filter((u) => u !== user)
+  }
+}
+
+const toggleAnalytics = async (user) => {
+  if (analyticsAuthors.value.includes(user)) {
+    analyticsAuthors.value = analyticsAuthors.value.filter((author) => author !== user)
+    return
+  }
+
+  analyticsAuthors.value = [...analyticsAuthors.value, user]
+}
+
+const isStatsLoading = (user) => statsLoading.value.includes(user)
 
 const clearCache = () => {
   if (!import.meta.client) return

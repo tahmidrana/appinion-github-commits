@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
 
     for (const commit of commits) {
       if (!commit.commit?.author?.name) continue
+
       const author = commit.commit.author.name
       if (!commitsByUser[author]) commitsByUser[author] = []
 
