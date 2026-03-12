@@ -28,7 +28,7 @@
                 class="h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white"
               >
                 <option value="">All contributors</option>
-                <option v-for="user in sortedUsers" :key="user" :value="user">{{ user }}</option>
+                <option v-for="user in rankedUsers" :key="user" :value="user">{{ user }}</option>
               </select>
             </label>
 
@@ -112,22 +112,29 @@
             v-for="(commits, user) in filteredCommits"
             :key="user"
             class="overflow-hidden rounded-2xl border shadow-sm"
-            :class="user === topAuthor ? 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-amber-100' : 'border-slate-200 bg-white/95 shadow-slate-200/60'"
+            :class="getAuthorCardClass(user)"
           >
             <button
               type="button"
               class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition"
-              :class="user === topAuthor ? 'hover:bg-amber-100/70' : 'hover:bg-sky-50/70'"
+              :class="getAuthorHoverClass(user)"
               @click="toggleAuthor(user)"
             >
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
+                  <span
+                    class="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-semibold"
+                    :class="getAuthorRankPillClass(user)"
+                  >
+                    #{{ getAuthorRank(user) }}
+                  </span>
                   <h2 class="truncate text-base font-semibold text-slate-950">{{ user }}</h2>
                   <span
-                    v-if="user === topAuthor"
-                    class="inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900"
+                    v-if="getAuthorRank(user) <= 3"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                    :class="getAuthorBadgeClass(user)"
                   >
-                    Top Contributor
+                    {{ getAuthorBadgeLabel(user) }}
                   </span>
                 </div>
                 <p class="text-xs text-slate-500">{{ commits.length }} {{ commits.length === 1 ? 'commit' : 'commits' }}</p>
@@ -229,7 +236,10 @@ const applyCommits = (payload, source) => {
   selectedUser.value = ''
   authorSearch.value = ''
 
-  const users = Object.keys(commitsData.value).sort()
+  const users = Object.keys(commitsData.value).sort((left, right) => {
+    const commitDiff = (commitsData.value[right]?.length || 0) - (commitsData.value[left]?.length || 0)
+    return commitDiff || left.localeCompare(right)
+  })
   openAuthors.value = users.length ? [users[0]] : []
   cacheStatus.value = source
 }
@@ -298,10 +308,15 @@ const fetchCommits = async () => {
   }
 }
 
-const sortedUsers = computed(() => Object.keys(commitsData.value).sort())
+const rankedUsers = computed(() =>
+  Object.keys(commitsData.value).sort((left, right) => {
+    const commitDiff = (commitsData.value[right]?.length || 0) - (commitsData.value[left]?.length || 0)
+    return commitDiff || left.localeCompare(right)
+  })
+)
 
 const filteredCommits = computed(() => {
-  let users = sortedUsers.value
+  let users = rankedUsers.value
 
   if (selectedUser.value) {
     users = users.filter((user) => user === selectedUser.value)
@@ -317,31 +332,18 @@ const filteredCommits = computed(() => {
   )
 })
 
-const hasResults = computed(() => sortedUsers.value.length > 0)
+const hasResults = computed(() => rankedUsers.value.length > 0)
 
 const stats = computed(() => {
   const commits = Object.values(commitsData.value).flat()
   return {
-    contributors: sortedUsers.value.length,
+    contributors: rankedUsers.value.length,
     commits: commits.length,
     projects: new Set(commits.map((commit) => commit.project)).size
   }
 })
 
-const topAuthor = computed(() => {
-  let currentTopAuthor = ''
-  let highestCommitCount = -1
-
-  for (const user of sortedUsers.value) {
-    const commitCount = commitsData.value[user]?.length || 0
-    if (commitCount > highestCommitCount) {
-      currentTopAuthor = user
-      highestCommitCount = commitCount
-    }
-  }
-
-  return currentTopAuthor
-})
+const topAuthor = computed(() => rankedUsers.value[0] || '')
 
 const monthLabel = computed(() => {
   if (!selectedMonth.value) return 'the selected month'
@@ -361,6 +363,48 @@ const formatDate = (isoString) => {
     hour: 'numeric',
     minute: '2-digit'
   })
+}
+
+const getAuthorRank = (user) => rankedUsers.value.indexOf(user) + 1
+
+const getAuthorBadgeLabel = (user) => {
+  const rank = getAuthorRank(user)
+  if (rank === 1) return 'Top Contributor'
+  if (rank === 2) return '2nd Place'
+  if (rank === 3) return '3rd Place'
+  return ''
+}
+
+const getAuthorCardClass = (user) => {
+  const rank = getAuthorRank(user)
+  if (rank === 1) return 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-amber-100'
+  if (rank === 2) return 'border-sky-300 bg-gradient-to-r from-sky-100 to-cyan-50 shadow-sky-100'
+  if (rank === 3) return 'border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 shadow-emerald-100'
+  return 'border-slate-200 bg-white/95 shadow-slate-200/60'
+}
+
+const getAuthorHoverClass = (user) => {
+  const rank = getAuthorRank(user)
+  if (rank === 1) return 'hover:bg-amber-100/70'
+  if (rank === 2) return 'hover:bg-sky-100/80'
+  if (rank === 3) return 'hover:bg-emerald-100/80'
+  return 'hover:bg-sky-50/70'
+}
+
+const getAuthorRankPillClass = (user) => {
+  const rank = getAuthorRank(user)
+  if (rank === 1) return 'bg-amber-200 text-amber-900'
+  if (rank === 2) return 'bg-sky-200 text-sky-900'
+  if (rank === 3) return 'bg-emerald-200 text-emerald-900'
+  return 'bg-sky-100 text-sky-700'
+}
+
+const getAuthorBadgeClass = (user) => {
+  const rank = getAuthorRank(user)
+  if (rank === 1) return 'bg-amber-200 text-amber-900'
+  if (rank === 2) return 'bg-sky-200 text-sky-900'
+  if (rank === 3) return 'bg-emerald-200 text-emerald-900'
+  return ''
 }
 
 const isAuthorOpen = (user) => openAuthors.value.includes(user)
