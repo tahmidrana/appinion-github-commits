@@ -78,6 +78,11 @@
       </section>
 
       <section class="relative">
+        <label v-if="hasResults" class="flex min-w-52 flex-col gap-1 mb-3">
+          <input v-model.trim="authorSearch" type="text" placeholder="Search author name"
+            class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500">
+        </label>
+
         <div
           v-if="loading"
           class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm"
@@ -180,6 +185,7 @@ const selectedMonth = ref(`${currentDate.getFullYear()}-${pad(currentDate.getMon
 const commitsData = ref({})
 const loading = ref(false)
 const selectedUser = ref('')
+const authorSearch = ref('')
 const errorMessage = ref('')
 const hasSearched = ref(false)
 const openAuthors = ref([])
@@ -211,6 +217,7 @@ const refreshCacheCount = () => {
 const applyCommits = (payload, source) => {
   commitsData.value = payload || {}
   selectedUser.value = ''
+  authorSearch.value = ''
 
   const users = Object.keys(commitsData.value).sort()
   openAuthors.value = users.length ? [users[0]] : []
@@ -284,8 +291,20 @@ const fetchCommits = async () => {
 const sortedUsers = computed(() => Object.keys(commitsData.value).sort())
 
 const filteredCommits = computed(() => {
-  if (!selectedUser.value) return commitsData.value
-  return { [selectedUser.value]: commitsData.value[selectedUser.value] || [] }
+  let users = sortedUsers.value
+
+  if (selectedUser.value) {
+    users = users.filter((user) => user === selectedUser.value)
+  }
+
+  if (authorSearch.value) {
+    const query = authorSearch.value.toLowerCase()
+    users = users.filter((user) => user.toLowerCase().includes(query))
+  }
+
+  return Object.fromEntries(
+    users.map((user) => [user, commitsData.value[user] || []])
+  )
 })
 
 const hasResults = computed(() => sortedUsers.value.length > 0)
