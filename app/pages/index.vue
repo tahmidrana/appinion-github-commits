@@ -1,7 +1,7 @@
 <template>
-  <main class="min-h-screen bg-slate-100 text-slate-900">
+  <main class="min-h-screen bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-50 text-slate-900">
     <div class="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6">
-      <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section class="rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/70">
         <div class="flex flex-col gap-4 p-4 lg:flex-row lg:items-end lg:justify-between">
           <div class="space-y-1">
             <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">GitHub activity</p>
@@ -17,7 +17,7 @@
               <input
                 v-model="selectedMonth"
                 type="month"
-                class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500"
+                class="h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white"
               >
             </label>
 
@@ -25,7 +25,7 @@
               <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Contributor</span>
               <select
                 v-model="selectedUser"
-                class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500"
+                class="h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white"
               >
                 <option value="">All contributors</option>
                 <option v-for="user in sortedUsers" :key="user" :value="user">{{ user }}</option>
@@ -33,7 +33,7 @@
             </label>
 
             <button
-              class="inline-flex h-10 items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70"
+              class="inline-flex h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-wait disabled:opacity-70"
               :disabled="loading"
               @click="fetchCommits"
             >
@@ -43,7 +43,7 @@
 
             <button
               type="button"
-              class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-sky-200 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="loading || cacheEntryCount === 0"
               @click="clearCache"
             >
@@ -53,34 +53,34 @@
         </div>
 
         <div class="grid gap-px border-t border-slate-200 bg-slate-200 sm:grid-cols-3">
-          <div class="bg-slate-50 px-4 py-3">
+          <div class="bg-sky-50/80 px-4 py-3">
             <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Contributors</p>
             <p class="mt-1 text-lg font-semibold text-slate-950">{{ stats.contributors }}</p>
           </div>
-          <div class="bg-slate-50 px-4 py-3">
+          <div class="bg-indigo-50/80 px-4 py-3">
             <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Commits</p>
             <p class="mt-1 text-lg font-semibold text-slate-950">{{ stats.commits }}</p>
           </div>
-          <div class="bg-slate-50 px-4 py-3">
+          <div class="bg-emerald-50/80 px-4 py-3">
             <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Repositories</p>
             <p class="mt-1 text-lg font-semibold text-slate-950">{{ stats.projects }}</p>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-2 text-xs text-slate-500">
           <p>{{ cacheStatus }}</p>
           <p>{{ cacheEntryCount }} cached {{ cacheEntryCount === 1 ? 'month' : 'months' }}</p>
         </div>
       </section>
 
-      <section v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+      <section v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm shadow-rose-100/80">
         {{ errorMessage }}
       </section>
 
       <section class="relative">
         <label v-if="hasResults" class="flex min-w-52 flex-col gap-1 mb-3">
           <input v-model.trim="authorSearch" type="text" placeholder="Search author name"
-            class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500">
+            class="h-10 rounded-xl border border-slate-300 bg-white/95 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white">
         </label>
 
         <div
@@ -95,14 +95,14 @@
 
         <div
           v-if="!hasSearched && !loading"
-          class="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500 shadow-sm"
+          class="rounded-2xl border border-slate-200 bg-white/95 px-4 py-10 text-center text-sm text-slate-500 shadow-sm shadow-slate-200/70"
         >
           Pick a month and load commits.
         </div>
 
         <div
           v-else-if="hasSearched && !hasResults && !loading"
-          class="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500 shadow-sm"
+          class="rounded-2xl border border-slate-200 bg-white/95 px-4 py-10 text-center text-sm text-slate-500 shadow-sm shadow-slate-200/70"
         >
           No commits found for {{ monthLabel }}.
         </div>
@@ -111,13 +111,13 @@
           <article
             v-for="(commits, user) in filteredCommits"
             :key="user"
-            class="overflow-hidden rounded-2xl border bg-slate-50"
-            :class="user === topAuthor ? 'border-amber-300 bg-amber-50 shadow-sm shadow-amber-100' : 'border-slate-200'"
+            class="overflow-hidden rounded-2xl border shadow-sm"
+            :class="user === topAuthor ? 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-amber-100' : 'border-slate-200 bg-white/95 shadow-slate-200/60'"
           >
             <button
               type="button"
               class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition"
-              :class="user === topAuthor ? 'hover:bg-amber-100/70' : 'hover:bg-slate-100'"
+              :class="user === topAuthor ? 'hover:bg-amber-100/70' : 'hover:bg-sky-50/70'"
               @click="toggleAuthor(user)"
             >
               <div class="min-w-0">
@@ -146,12 +146,12 @@
               </span>
             </button>
 
-            <div v-if="isAuthorOpen(user)" class="border-t border-slate-200 bg-white px-4 py-3">
+            <div v-if="isAuthorOpen(user)" class="border-t border-slate-200 bg-white/95 px-4 py-3">
               <ul class="space-y-2">
                 <li
                   v-for="commit in commits"
                   :key="`${commit.project}-${commit.hash}-${commit.date}`"
-                  class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                  class="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2"
                 >
                   <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
@@ -160,11 +160,11 @@
                           :href="commit.url"
                           target="_blank"
                           rel="noreferrer"
-                          class="text-xs font-semibold text-sky-700 hover:text-sky-800"
+                          class="text-xs font-semibold text-sky-700 hover:text-sky-900"
                         >
                           {{ commit.hash }}
                         </a>
-                        <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
                           {{ commit.project }}
                         </span>
                       </div>
