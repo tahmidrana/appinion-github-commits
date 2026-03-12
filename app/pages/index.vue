@@ -111,15 +111,25 @@
           <article
             v-for="(commits, user) in filteredCommits"
             :key="user"
-            class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+            class="overflow-hidden rounded-2xl border bg-slate-50"
+            :class="user === topAuthor ? 'border-amber-300 bg-amber-50 shadow-sm shadow-amber-100' : 'border-slate-200'"
           >
             <button
               type="button"
-              class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-100"
+              class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition"
+              :class="user === topAuthor ? 'hover:bg-amber-100/70' : 'hover:bg-slate-100'"
               @click="toggleAuthor(user)"
             >
               <div class="min-w-0">
-                <h2 class="truncate text-base font-semibold text-slate-950">{{ user }}</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="truncate text-base font-semibold text-slate-950">{{ user }}</h2>
+                  <span
+                    v-if="user === topAuthor"
+                    class="inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900"
+                  >
+                    Top Contributor
+                  </span>
+                </div>
                 <p class="text-xs text-slate-500">{{ commits.length }} {{ commits.length === 1 ? 'commit' : 'commits' }}</p>
               </div>
               <span
@@ -316,6 +326,21 @@ const stats = computed(() => {
     commits: commits.length,
     projects: new Set(commits.map((commit) => commit.project)).size
   }
+})
+
+const topAuthor = computed(() => {
+  let currentTopAuthor = ''
+  let highestCommitCount = -1
+
+  for (const user of sortedUsers.value) {
+    const commitCount = commitsData.value[user]?.length || 0
+    if (commitCount > highestCommitCount) {
+      currentTopAuthor = user
+      highestCommitCount = commitCount
+    }
+  }
+
+  return currentTopAuthor
 })
 
 const monthLabel = computed(() => {
