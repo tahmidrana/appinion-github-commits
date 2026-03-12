@@ -21,10 +21,6 @@ export default defineEventHandler(async (event) => {
   let commitsByUser: Record<string, any[]> = {}
 
   for (const repo of repos) {
-    console.log(`##########################################################`);
-    console.log(`Processing repo: ${repo.name}`);
-    console.log(`##########################################################`);
-    
     const commitsRes = await fetch(
       `https://api.github.com/repos/${org}/${repo.name}/commits?since=${from}T00:00:00Z&until=${to}T23:59:59Z&per_page=100`,
       { headers }
@@ -33,10 +29,6 @@ export default defineEventHandler(async (event) => {
     if (!Array.isArray(commits) || commits.length === 0) continue
 
     for (const commit of commits) {
-      console.log(commit);
-      console.log('------------------------------------------------------------------------------------');
-      
-      
       if (!commit.commit?.author?.name) continue
       const author = commit.commit.author.name
       if (!commitsByUser[author]) commitsByUser[author] = []
