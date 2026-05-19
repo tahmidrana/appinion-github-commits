@@ -78,10 +78,22 @@
       </section>
 
       <section class="relative">
-        <label v-if="hasResults" class="flex min-w-52 flex-col gap-1 mb-3">
-          <input v-model.trim="authorSearch" type="text" placeholder="Search author name"
-            class="h-10 rounded-xl border border-slate-300 bg-white/95 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white">
-        </label>
+        <div v-if="hasResults" class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <label class="flex min-w-52 flex-col gap-1">
+            <input v-model.trim="authorSearch" type="text" placeholder="Search author name"
+              class="h-10 rounded-xl border border-slate-300 bg-white/95 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white">
+          </label>
+          <div class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm">
+            <svg viewBox="0 0 16 16" fill="currentColor" class="h-3 w-3 text-slate-400">
+              <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm.75 4.25a.75.75 0 0 0-1.5 0v3c0 .27.144.52.378.655l2 1.155a.75.75 0 0 0 .744-1.3L8.75 7.655V5.25Z" />
+            </svg>
+            Ranked by
+            <span class="font-semibold text-indigo-600">Projects 60%</span>
+            <span class="text-slate-300">+</span>
+            <span class="font-semibold text-sky-600">Commits 40%</span>
+            <span class="text-slate-400">(normalized)</span>
+          </div>
+        </div>
 
         <div
           v-if="loading"
@@ -136,7 +148,9 @@
                     {{ getAuthorBadgeLabel(user) }}
                   </span>
                 </div>
-                <p class="text-xs text-slate-500">{{ commits.length }} {{ commits.length === 1 ? 'commit' : 'commits' }}</p>
+                <p class="mt-1 pl-1 text-xs text-slate-500">
+                  {{ commits.length }} {{ commits.length === 1 ? 'commit' : 'commits' }} in {{ new Set(commits.map((c) => c.project)).size }} {{ new Set(commits.map((c) => c.project)).size === 1 ? 'project' : 'projects' }}
+                </p>
               </button>
 
               <div class="flex items-center gap-2">
@@ -377,12 +391,20 @@ const fetchCommits = async () => {
   }
 }
 
-const rankedUsers = computed(() =>
-  Object.keys(commitsData.value).sort((left, right) => {
-    const commitDiff = (commitsData.value[right]?.length || 0) - (commitsData.value[left]?.length || 0)
-    return commitDiff || left.localeCompare(right)
-  })
-)
+const rankedUsers = computed(() => {
+  const users = Object.keys(commitsData.value)
+  const maxCommits = Math.max(...users.map((u) => commitsData.value[u]?.length || 0), 1)
+  const maxProjects = Math.max(
+    ...users.map((u) => new Set(commitsData.value[u]?.map((c) => c.project)).size),
+    1
+  )
+  const scoreOf = (user) => {
+    const commits = commitsData.value[user]?.length || 0
+    const projects = new Set(commitsData.value[user]?.map((c) => c.project)).size
+    return (projects / maxProjects) * 0.6 + (commits / maxCommits) * 0.4
+  }
+  return users.sort((left, right) => scoreOf(right) - scoreOf(left) || left.localeCompare(right))
+})
 
 const filteredCommits = computed(() => {
   let users = rankedUsers.value
