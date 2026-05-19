@@ -150,6 +150,10 @@
                 </div>
                 <p class="mt-1 pl-1 text-xs text-slate-500">
                   {{ commits.length }} {{ commits.length === 1 ? 'commit' : 'commits' }} in {{ new Set(commits.map((c) => c.project)).size }} {{ new Set(commits.map((c) => c.project)).size === 1 ? 'project' : 'projects' }}
+                  <span class="mx-1 text-slate-300">/</span>
+                  <span :class="new Set(commits.map((c) => c.date.slice(0, 10))).size < 12 ? 'text-rose-500' : ''">
+                    {{ new Set(commits.map((c) => c.date.slice(0, 10))).size }} active {{ new Set(commits.map((c) => c.date.slice(0, 10))).size === 1 ? 'day' : 'days' }}
+                  </span>
                 </p>
               </button>
 
@@ -189,11 +193,23 @@
             >
               <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <p class="text-[11px] uppercase tracking-wide text-slate-500">Commits</p>
-                <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).commits }}</p>
+                <p v-if="hasPrevMonthCache && getAuthorComparison(user)" class="mt-1 flex items-center gap-1 text-sm font-semibold">
+                  <span v-if="getAuthorComparison(user).commitDiff > 0" class="text-base font-black text-emerald-500">↑</span>
+                  <span v-else-if="getAuthorComparison(user).commitDiff < 0" class="text-base font-black text-rose-500">↓</span>
+                  <span :class="getAuthorComparison(user).commitDiff > 0 ? 'text-emerald-500' : getAuthorComparison(user).commitDiff < 0 ? 'text-rose-500' : 'text-slate-900'">{{ getAuthorAnalytics(user).commits }}</span>
+                  <span class="font-normal text-slate-400">vs {{ getAuthorComparison(user).prevCommits }}</span>
+                </p>
+                <p v-else class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).commits }}</p>
               </div>
               <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <p class="text-[11px] uppercase tracking-wide text-slate-500">Projects</p>
-                <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).projects }}</p>
+                <p v-if="hasPrevMonthCache && getAuthorComparison(user)" class="mt-1 flex items-center gap-1 text-sm font-semibold">
+                  <span v-if="getAuthorComparison(user).projectDiff > 0" class="text-base font-black text-emerald-500">↑</span>
+                  <span v-else-if="getAuthorComparison(user).projectDiff < 0" class="text-base font-black text-rose-500">↓</span>
+                  <span :class="getAuthorComparison(user).projectDiff > 0 ? 'text-emerald-500' : getAuthorComparison(user).projectDiff < 0 ? 'text-rose-500' : 'text-slate-900'">{{ getAuthorAnalytics(user).projects }}</span>
+                  <span class="font-normal text-slate-400">vs {{ getAuthorComparison(user).prevProjects }}</span>
+                </p>
+                <p v-else class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).projects }}</p>
               </div>
               <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <p class="text-[11px] uppercase tracking-wide text-slate-500">Lines added</p>
@@ -227,6 +243,7 @@
                 <p class="text-[11px] uppercase tracking-wide text-slate-500">Latest commit</p>
                 <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).latestCommit }}</p>
               </div>
+
             </div>
 
             <div v-if="isAuthorOpen(user)" class="border-t border-slate-200 bg-white/95 px-4 py-3">
@@ -454,6 +471,42 @@ const formatDate = (isoString) => {
     hour: 'numeric',
     minute: '2-digit'
   })
+}
+
+const prevMonth = computed(() => {
+  if (!selectedMonth.value) return ''
+  const [year, month] = selectedMonth.value.split('-').map(Number)
+  const d = new Date(year, month - 2, 1)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
+})
+
+
+const prevMonthData = computed(() => {
+  if (!import.meta.client || !prevMonth.value) return null
+  void cacheEntryCount.value
+  const cached = localStorage.getItem(getCacheKey(prevMonth.value))
+  if (!cached) return null
+  try { return JSON.parse(cached) } catch { return null }
+})
+
+const hasPrevMonthCache = computed(() =>
+  prevMonthData.value !== null && Object.keys(commitsData.value).length > 0
+)
+
+const getAuthorComparison = (user) => {
+  if (!prevMonthData.value) return null
+  const prev = prevMonthData.value[user] || []
+  const curr = commitsData.value[user] || []
+  const prevCommits = prev.length
+  const prevProjects = new Set(prev.map((c) => c.project)).size
+  const currCommits = curr.length
+  const currProjects = new Set(curr.map((c) => c.project)).size
+  return {
+    prevCommits,
+    prevProjects,
+    commitDiff: currCommits - prevCommits,
+    projectDiff: currProjects - prevProjects
+  }
 }
 
 const getAuthorAnalytics = (user) => {
