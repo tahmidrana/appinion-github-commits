@@ -244,6 +244,11 @@
                 <p class="mt-1 text-sm font-semibold text-slate-900">{{ getAuthorAnalytics(user).latestCommit }}</p>
               </div>
 
+              <div class="sm:col-span-5 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p class="mb-1 text-[11px] uppercase tracking-wide text-slate-500">Daily commits</p>
+                <div :id="chartId(user)" style="height:140px"></div>
+              </div>
+
             </div>
 
             <div v-if="isAuthorOpen(user)" class="border-t border-slate-200 bg-white/95 px-4 py-3">
@@ -285,7 +290,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 const pad = (value) => `${value}`.padStart(2, '0')
 const CACHE_PREFIX = 'github-commits-cache:v1:'
@@ -631,6 +636,60 @@ const toggleAnalytics = async (user) => {
 
 const isStatsLoading = (user) => statsLoading.value.includes(user)
 
+const googleChartsReady = ref(false)
+
+const chartId = (user) => `gc-${user.replace(/[^a-z0-9]/gi, '-')}`
+
+const loadGoogleCharts = () =>
+  new Promise((resolve) => {
+    if (window.google?.visualization) { resolve(); return }
+    if (window.google?.charts) { window.google.charts.setOnLoadCallback(resolve); return }
+    const script = document.createElement('script')
+    script.src = 'https://www.gstatic.com/charts/loader.js'
+    script.onload = () => {
+      window.google.charts.load('current', { packages: ['corechart'] })
+      window.google.charts.setOnLoadCallback(resolve)
+    }
+    document.head.appendChild(script)
+  })
+
+const drawChart = (user) => {
+  const el = document.getElementById(chartId(user))
+  if (!el || !window.google?.visualization) return
+
+  const commits = commitsData.value[user] || []
+  const [year, month] = selectedMonth.value.split('-').map(Number)
+  const days = new Date(year, month, 0).getDate()
+  const counts = {}
+  for (const commit of commits) {
+    const day = parseInt(commit.date.slice(8, 10), 10)
+    counts[day] = (counts[day] || 0) + 1
+  }
+
+  const rows = [['Day', 'Commits']]
+  for (let d = 1; d <= days; d++) rows.push([d, counts[d] || 0])
+
+  const data = window.google.visualization.arrayToDataTable(rows)
+  const options = {
+    legend: 'none',
+    backgroundColor: 'transparent',
+    chartArea: { left: 28, top: 8, right: 8, bottom: 24, width: '100%', height: '100%' },
+    hAxis: { textStyle: { color: '#94a3b8', fontSize: 9 }, gridlines: { color: 'transparent' }, minValue: 1, maxValue: days },
+    vAxis: { textStyle: { color: '#94a3b8', fontSize: 9 }, gridlines: { color: '#f1f5f9' }, minValue: 0, format: '0' },
+    series: { 0: { color: '#0ea5e9', lineWidth: 2, areaOpacity: 0.12 } },
+    curveType: 'function',
+    pointSize: 4,
+  }
+
+  new window.google.visualization.AreaChart(el).draw(data, options)
+}
+
+watch(analyticsAuthors, async (users) => {
+  if (!googleChartsReady.value) return
+  await nextTick()
+  users.forEach(drawChart)
+})
+
 const clearCache = () => {
   if (!import.meta.client) return
 
@@ -642,7 +701,9 @@ const clearCache = () => {
   cacheStatus.value = 'Cache cleared.'
 }
 
-onMounted(() => {
+onMounted(async () => {
   refreshCacheCount()
+  await loadGoogleCharts()
+  googleChartsReady.value = true
 })
 </script>
