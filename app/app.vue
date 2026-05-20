@@ -17,6 +17,13 @@
         >
           Repositories
         </NuxtLink>
+        <NuxtLink
+          to="/frameworks"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition"
+          :class="$route.path === '/frameworks' ? 'bg-sky-50 text-sky-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+        >
+          Frameworks
+        </NuxtLink>
         <button
           class="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           @click="logout"
