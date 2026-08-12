@@ -66,6 +66,7 @@ const listSource = async (source: BackupSource): Promise<SourceResult> => {
   const accessKeyId = process.env[account.accessKeyId]
   const secretAccessKey = process.env[account.secretAccessKey]
   const region = process.env[account.region] || process.env.AWS_REGION
+  const bucket = source.bucketEnv ? (process.env[source.bucketEnv] || '') : source.bucket
 
   const base: SourceResult = {
     id: source.id,
@@ -94,7 +95,7 @@ const listSource = async (source: BackupSource): Promise<SourceResult> => {
   try {
     do {
       const command = new ListObjectsV2Command({
-        Bucket: source.bucket,
+        Bucket: bucket,
         Prefix: source.prefix || undefined,
         ContinuationToken: continuationToken
       })
@@ -148,7 +149,7 @@ const listSource = async (source: BackupSource): Promise<SourceResult> => {
     } while (continuationToken)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return { ...base, error: `Failed to list ${source.bucket}/${source.prefix}: ${message}` }
+    return { ...base, error: `Failed to list ${bucket}/${source.prefix}: ${message}` }
   }
 
   const projects = Object.values(byProject)

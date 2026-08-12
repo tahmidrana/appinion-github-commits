@@ -5,6 +5,7 @@ export type BackupSource = {
   label: string
   account: SourceAccount
   bucket: string
+  bucketEnv?: string
   prefix: string
   timezone: string
   groupBy: 'folder' | 'flat'
@@ -28,7 +29,8 @@ export const BACKUP_SOURCES: BackupSource[] = [
     id: 'appinion-projects',
     label: 'Appinion Projects',
     account: 'appinion',
-    bucket: 'appinion-projects-db-backup',
+    bucket: '',
+    bucketEnv: 'APPINION_AWS_BUCKET',
     prefix: '',
     timezone: 'Asia/Dhaka',
     groupBy: 'folder'
