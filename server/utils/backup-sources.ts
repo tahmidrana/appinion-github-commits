@@ -6,7 +6,6 @@ export type BackupSource = {
   account: SourceAccount
   bucket: string
   prefix: string
-  region: string
   timezone: string
   groupBy: 'folder' | 'flat'
 }
@@ -31,7 +30,6 @@ export const BACKUP_SOURCES: BackupSource[] = [
     account: 'appinion',
     bucket: 'appinion-projects-db-backup',
     prefix: '',
-    region: 'ap-southeast-1',
     timezone: 'Asia/Dhaka',
     groupBy: 'folder'
   },
@@ -41,7 +39,6 @@ export const BACKUP_SOURCES: BackupSource[] = [
     account: 'renata',
     bucket: 'momenta-files',
     prefix: 'Momenta-New-Backups',
-    region: 'ap-southeast-1',
     timezone: 'Asia/Dhaka',
     groupBy: 'flat'
   },
@@ -51,7 +48,6 @@ export const BACKUP_SOURCES: BackupSource[] = [
     account: 'renata',
     bucket: 're-develop-backups',
     prefix: 'Re-Develop-Learning-Portal',
-    region: 'ap-southeast-1',
     timezone: 'Asia/Dhaka',
     groupBy: 'flat'
   },
@@ -61,7 +57,6 @@ export const BACKUP_SOURCES: BackupSource[] = [
     account: 'renata',
     bucket: 'renata-ahd-database-backup',
     prefix: 'Animedex',
-    region: 'ap-southeast-1',
     timezone: 'Asia/Dhaka',
     groupBy: 'flat'
   },
@@ -71,7 +66,6 @@ export const BACKUP_SOURCES: BackupSource[] = [
     account: 'renata',
     bucket: 'renata-mis-backup',
     prefix: 'Renata-MIS',
-    region: 'ap-southeast-1',
     timezone: 'Asia/Dhaka',
     groupBy: 'flat'
   }

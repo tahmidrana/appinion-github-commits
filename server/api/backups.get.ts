@@ -65,7 +65,7 @@ const listSource = async (source: BackupSource): Promise<SourceResult> => {
   const account = BACKUP_ACCOUNTS[source.account]
   const accessKeyId = process.env[account.accessKeyId]
   const secretAccessKey = process.env[account.secretAccessKey]
-  const region = source.region || process.env[account.region] || 'ap-southeast-1'
+  const region = process.env[account.region] || process.env.AWS_REGION
 
   const base: SourceResult = {
     id: source.id,
