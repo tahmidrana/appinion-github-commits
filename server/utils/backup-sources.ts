@@ -13,9 +13,9 @@ export type BackupSource = {
 
 export const BACKUP_ACCOUNTS: Record<SourceAccount, { accessKeyId: string; secretAccessKey: string; region: string }> = {
   appinion: {
-    accessKeyId: 'AWS_ACCESS_KEY_ID',
-    secretAccessKey: 'AWS_SECRET_ACCESS_KEY',
-    region: 'AWS_DEFAULT_REGION'
+    accessKeyId: 'APPINION_AWS_ACCESS_KEY_ID',
+    secretAccessKey: 'APPINION_AWS_SECRET_ACCESS_KEY',
+    region: 'APPINION_AWS_DEFAULT_REGION'
   },
   renata: {
     accessKeyId: 'RENATA_AWS_ACCESS_KEY_ID',
