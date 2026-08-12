@@ -22,6 +22,18 @@
               >
             </label>
 
+            <label v-if="hasData" class="flex min-w-40 flex-col gap-1">
+              <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Account</span>
+              <select
+                v-model="accountFilter"
+                class="h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white"
+              >
+                <option value="all">All accounts</option>
+                <option value="appinion">Appinion</option>
+                <option value="renata">Renata</option>
+              </select>
+            </label>
+
             <button
               class="inline-flex h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-wait disabled:opacity-70"
               :disabled="loading"
@@ -50,8 +62,16 @@
 
         <div v-if="hasData" class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-2 text-xs text-slate-500">
           <p>{{ dataStatus }}</p>
-          <p>{{ filteredProjects.length }} of {{ stats.projects }} shown</p>
+          <p>{{ filteredProjects.length }} of {{ visibleProjects.length }} shown</p>
         </div>
+      </section>
+
+      <section
+        v-for="source in errorSources"
+        :key="`error-${source.id}`"
+        class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm shadow-rose-100/80"
+      >
+        <span class="font-semibold">{{ source.label }}</span> — {{ source.error }}
       </section>
 
       <section v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm shadow-rose-100/80">
@@ -80,7 +100,8 @@
           v-else-if="hasData && filteredProjects.length === 0 && !loading"
           class="rounded-2xl border border-slate-200 bg-white/95 px-4 py-10 text-center text-sm text-slate-500 shadow-sm shadow-slate-200/70"
         >
-          No projects match "{{ projectSearch }}".
+          <template v-if="projectSearch">No projects match "{{ projectSearch }}".</template>
+          <template v-else>No backups found.</template>
         </div>
 
         <div v-else-if="filteredProjects.length > 0" class="flex flex-wrap items-center justify-between gap-2">
@@ -100,16 +121,35 @@
           </button>
         </div>
 
-        <div v-if="filteredProjects.length > 0" class="space-y-3">
-          <article
-            v-for="project in filteredProjects"
-            :key="project.name"
-            class="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/60"
-          >
+        <div v-if="filteredProjects.length > 0" class="space-y-6">
+          <section v-for="group in groupedProjects" :key="group.account" class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-1 pt-1">
+              <div class="flex items-center gap-2">
+                <span
+                  :data-testid="`group-heading-${group.account}`"
+                  class="text-[11px] font-semibold uppercase tracking-[0.24em]"
+                  :class="group.account === 'renata' ? 'text-violet-600' : 'text-sky-700'"
+                >
+                  {{ group.label }}
+                </span>
+                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  {{ group.items.length }} {{ group.items.length === 1 ? 'project' : 'projects' }}
+                </span>
+              </div>
+              <span class="text-xs text-slate-400">
+                {{ group.backupCount }} {{ group.backupCount === 1 ? 'backup' : 'backups' }} · {{ formatSize(group.totalSize) }}
+              </span>
+            </div>
+
+            <article
+              v-for="item in group.items"
+              :key="`${item.source.id}:${item.project.name}`"
+              :class="cardClass(item)"
+            >
             <button
               type="button"
               class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-sky-50/70"
-              @click="toggleProject(project.name)"
+              @click="toggleProject(item)"
             >
               <span
                 class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700"
@@ -122,31 +162,50 @@
 
               <span class="min-w-0 flex-1">
                 <span class="flex flex-wrap items-center gap-2">
-                  <h2 class="truncate text-base font-semibold text-slate-950">{{ project.name }}</h2>
+                  <h2 class="truncate text-base font-semibold text-slate-950">{{ item.project.name }}</h2>
                   <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
-                    {{ project.count }} {{ project.count === 1 ? 'backup' : 'backups' }}
+                    {{ item.project.count }} {{ item.project.count === 1 ? 'backup' : 'backups' }}
                   </span>
                   <span
-                    v-if="projectLatest(project)"
+                    v-if="projectLatest(item.project)"
                     class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
                   >
-                    Latest {{ formatDate(projectLatest(project).date) }}
+                    Latest {{ formatDate(projectLatest(item.project).date) }}
                   </span>
                   <span
-                    v-if="missingBadge(project)"
+                    v-if="missingBadge(item.project, item.source.today)"
                     class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700"
                   >
-                    {{ missingBadge(project) }}
+                    {{ missingBadge(item.project, item.source.today) }}
+                  </span>
+                  <span
+                    class="rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                    :class="accountBadgeClass(item.source.account)"
+                  >
+                    {{ item.source.label }}
+                  </span>
+                  <span
+                    v-if="pruneSuggestion(item.project)"
+                    class="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
+                    :title="pruneSuggestion(item.project)"
+                  >
+                    Prune old backups
+                  </span>
+                  <span
+                    v-if="dangerMessage(item.project, item.source.today)"
+                    class="rounded-full border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700"
+                  >
+                    {{ dangerMessage(item.project, item.source.today) }}
                   </span>
                 </span>
                 <span class="mt-1 block pl-0.5 text-xs text-slate-500">
-                  {{ formatSize(project.totalSize) }} total
+                  {{ formatSize(item.project.totalSize) }} total
                 </span>
               </span>
 
               <span
                 class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-transform"
-                :class="isOpen(project.name) ? 'rotate-180' : ''"
+                :class="isOpen(item) ? 'rotate-180' : ''"
                 aria-hidden="true"
               >
                 <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
@@ -159,10 +218,10 @@
               </span>
             </button>
 
-            <div v-if="isOpen(project.name)" class="border-t border-slate-200 bg-white/95 px-4 py-3">
+            <div v-if="isOpen(item)" class="border-t border-slate-200 bg-white/95 px-4 py-3">
               <ul class="space-y-2">
                 <li
-                  v-for="range in missingRanges(project)"
+                  v-for="range in missingRanges(item.project, item.source.today)"
                   :key="`missing-${range.from}`"
                   class="flex flex-col gap-2 rounded-xl border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                   :class="range.includesToday ? 'border-rose-300 bg-rose-100/90' : 'border-rose-200 bg-rose-50/90'"
@@ -197,7 +256,7 @@
                   </span>
                 </li>
                 <li
-                  v-for="backup in project.backups"
+                  v-for="backup in item.project.backups"
                   :key="backup.key"
                   class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                 >
@@ -221,6 +280,7 @@
               </ul>
             </div>
           </article>
+          </section>
         </div>
       </section>
     </div>
@@ -230,19 +290,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 
-const projects = ref([])
+const sources = ref([])
 const openProjects = ref([])
 const projectSearch = ref('')
+const accountFilter = ref('all')
 const loading = ref(false)
 const errorMessage = ref('')
 const dataStatus = ref('')
 const hasData = ref(false)
-const today = ref('')
-
-const localToday = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
 
 const fetchBackups = async () => {
   errorMessage.value = ''
@@ -250,12 +305,11 @@ const fetchBackups = async () => {
   try {
     const payload = await $fetch('/api/backups')
     if (payload?.error) throw new Error(payload.error)
-    projects.value = payload?.projects || []
-    today.value = payload?.today || localToday()
+    sources.value = payload?.sources || []
     hasData.value = true
-    dataStatus.value = `Synced with S3 at ${formatDateTime(payload?.listedAt || '')}.`
+    dataStatus.value = `Synced with S3 at ${formatDateTime(payload?.listedAt || '')} · ${sources.value.length} ${sources.value.length === 1 ? 'source' : 'sources'}.`
   } catch (err) {
-    projects.value = []
+    sources.value = []
     hasData.value = false
     errorMessage.value = err instanceof Error ? err.message : 'An unexpected error occurred.'
     dataStatus.value = ''
@@ -264,35 +318,93 @@ const fetchBackups = async () => {
   }
 }
 
+const visibleSources = computed(() => {
+  if (accountFilter.value === 'all') return sources.value
+  return sources.value.filter((source) => source.account === accountFilter.value)
+})
+
+const errorSources = computed(() => visibleSources.value.filter((source) => source.error))
+
+const visibleProjects = computed(() =>
+  visibleSources.value.flatMap((source) =>
+    (source.projects || []).map((project) => ({ source, project }))
+  )
+)
+
 const filteredProjects = computed(() => {
-  if (!projectSearch.value) return projects.value
+  if (!projectSearch.value) return visibleProjects.value
   const query = projectSearch.value.toLowerCase()
-  return projects.value.filter((project) => project.name.toLowerCase().includes(query))
+  return visibleProjects.value.filter(({ project }) => project.name.toLowerCase().includes(query))
 })
 
 const stats = computed(() => ({
-  projects: projects.value.length,
-  backups: projects.value.reduce((sum, project) => sum + project.count, 0),
-  totalSize: formatSize(projects.value.reduce((sum, project) => sum + project.totalSize, 0))
+  projects: visibleProjects.value.length,
+  backups: visibleProjects.value.reduce((sum, { project }) => sum + project.count, 0),
+  totalSize: formatSize(visibleProjects.value.reduce((sum, { project }) => sum + project.totalSize, 0))
 }))
 
-const isOpen = (name) => openProjects.value.includes(name)
+const groupedProjects = computed(() =>
+  ['appinion', 'renata']
+    .map((account) => {
+      const items = filteredProjects.value.filter(({ source }) => source.account === account)
+      if (items.length === 0) return null
+      return {
+        account,
+        label: account === 'appinion' ? 'Appinion' : 'Renata',
+        items,
+        backupCount: items.reduce((sum, { project }) => sum + project.count, 0),
+        totalSize: items.reduce((sum, { project }) => sum + project.totalSize, 0)
+      }
+    })
+    .filter(Boolean)
+)
 
-const toggleProject = (name) => {
-  openProjects.value = isOpen(name)
-    ? openProjects.value.filter((p) => p !== name)
-    : [...openProjects.value, name]
+const daysSinceLastBackup = (project, todayValue) => {
+  if (!todayValue || project.backups.length === 0) return null
+  const latest = project.backups[0].date
+  if (latest > todayValue) return 0
+  return dayDiff(latest, todayValue)
+}
+
+const pruneSuggestion = (project) => (project.count > 10 ? `${project.count} backups stored — delete backups older than the last 10` : '')
+
+const dangerMessage = (project, todayValue) => {
+  const days = daysSinceLastBackup(project, todayValue)
+  if (days === null || days < 10) return ''
+  return `No backup in ${days} days`
+}
+
+const cardClass = (item) => {
+  const base = 'overflow-hidden rounded-2xl border bg-white/95 shadow-sm'
+  if (dangerMessage(item.project, item.source.today)) return `${base} border-rose-300 shadow-rose-100`
+  if (pruneSuggestion(item.project)) return `${base} border-amber-300 shadow-amber-100`
+  return `${base} border-slate-200 shadow-slate-200/60`
+}
+
+const projectKey = (item) => `${item.source.id}:${item.project.name}`
+
+const isOpen = (item) => openProjects.value.includes(projectKey(item))
+
+const toggleProject = (item) => {
+  const key = projectKey(item)
+  openProjects.value = isOpen(item)
+    ? openProjects.value.filter((k) => k !== key)
+    : [...openProjects.value, key]
 }
 
 const toggleAll = () => {
   if (allOpen.value) {
     openProjects.value = []
   } else {
-    openProjects.value = filteredProjects.value.map((project) => project.name)
+    openProjects.value = filteredProjects.value.map(projectKey)
   }
 }
 
 const allOpen = computed(() => filteredProjects.value.length > 0 && openProjects.value.length === filteredProjects.value.length)
+
+const accountBadgeClass = (account) => account === 'renata'
+  ? 'border-violet-200 bg-violet-100 text-violet-700'
+  : 'border-sky-200 bg-sky-100 text-sky-700'
 
 const projectLatest = (project) => (project.count > 0 ? project.backups[0] : null)
 
@@ -310,12 +422,12 @@ const dayDiff = (from, to) => {
   return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000)
 }
 
-const missingRanges = (project) => {
-  if (!today.value || project.backups.length === 0) return []
+const missingRanges = (project, todayValue) => {
+  if (!todayValue || project.backups.length === 0) return []
 
   const dates = new Set(project.backups.map((backup) => backup.date))
   const start = [...dates].sort()[0]
-  const end = today.value
+  const end = todayValue
   if (start > end) return []
 
   const ranges = []
@@ -341,8 +453,8 @@ const missingRanges = (project) => {
   }))
 }
 
-const missingBadge = (project) => {
-  const ranges = missingRanges(project)
+const missingBadge = (project, todayValue) => {
+  const ranges = missingRanges(project, todayValue)
   if (ranges.length === 0) return ''
   if (ranges.some((range) => range.includesToday)) return 'Missing today'
   const total = ranges.reduce((sum, range) => sum + range.count, 0)

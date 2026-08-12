@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3'
 import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { BACKUP_SOURCES, BACKUP_ACCOUNTS, type BackupSource, type SourceAccount } from '../utils/backup-sources'
 
 type Backup = {
   file: string
@@ -19,7 +20,17 @@ type Project = {
   backups: Backup[]
 }
 
-const BACKUP_TZ = 'Asia/Dhaka'
+type SourceResult = {
+  id: string
+  label: string
+  account: SourceAccount
+  error: string | null
+  today: string
+  projects: Project[]
+  totalProjects: number
+  totalBackups: number
+  listedCount: number
+}
 
 const getTodayInTz = (tz: string): string => {
   const fmt = new Intl.DateTimeFormat('en-US', {
@@ -44,14 +55,32 @@ const parseBackupTimestamp = (name: string): { date: string; time: string; iso: 
   }
 }
 
-export default defineEventHandler(async () => {
-  const bucket = process.env.AWS_BUCKET
-  const region = process.env.AWS_DEFAULT_REGION || 'ap-southeast-1'
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+const extractBackupType = (fileName: string): string => {
+  const match = fileName.match(/^(.*?)\d{4}-\d{2}-\d{2}/)
+  const raw = match ? match[1] : fileName
+  return raw.replace(/[-_]+$/g, '').trim()
+}
 
-  if (!bucket || !accessKeyId || !secretAccessKey) {
-    return { error: 'AWS credentials are not configured' }
+const listSource = async (source: BackupSource): Promise<SourceResult> => {
+  const account = BACKUP_ACCOUNTS[source.account]
+  const accessKeyId = process.env[account.accessKeyId]
+  const secretAccessKey = process.env[account.secretAccessKey]
+  const region = source.region || process.env[account.region] || 'ap-southeast-1'
+
+  const base: SourceResult = {
+    id: source.id,
+    label: source.label,
+    account: source.account,
+    error: null,
+    today: getTodayInTz(source.timezone),
+    projects: [],
+    totalProjects: 0,
+    totalBackups: 0,
+    listedCount: 0
+  }
+
+  if (!accessKeyId || !secretAccessKey) {
+    return { ...base, error: `AWS credentials not configured for ${source.account}` }
   }
 
   const client = new S3Client({
@@ -61,37 +90,45 @@ export default defineEventHandler(async () => {
 
   const byProject: Record<string, Project> = {}
   let continuationToken: string | undefined
-  let listedCount = 0
 
   try {
     do {
       const command = new ListObjectsV2Command({
-        Bucket: bucket,
+        Bucket: source.bucket,
+        Prefix: source.prefix || undefined,
         ContinuationToken: continuationToken
       })
       const result = await client.send(command)
-      listedCount += result.KeyCount || 0
+      base.listedCount += result.KeyCount || 0
 
       for (const obj of result.Contents || []) {
         const key = obj.Key || ''
-        const slash = key.indexOf('/')
-        if (slash <= 0) continue
-
-        const projectName = key.slice(0, slash)
-        const fileName = key.slice(slash + 1)
-        if (!fileName) continue
+        const relative = source.prefix
+          ? key.slice(source.prefix.length).replace(/^\/+/, '')
+          : key
+        if (!relative || relative.endsWith('/')) continue
 
         const lastModified = obj.LastModified?.toISOString() || ''
-        const ts = parseBackupTimestamp(fileName)
+        const ts = parseBackupTimestamp(relative)
 
         const backup: Backup = {
-          file: fileName,
+          file: relative,
           key,
           date: ts?.date || lastModified.slice(0, 10),
           time: ts?.time || lastModified.slice(11, 19),
           iso: ts?.iso || lastModified,
           size: obj.Size || 0,
           lastModified
+        }
+
+        let projectName: string
+        if (source.groupBy === 'folder') {
+          const slash = relative.indexOf('/')
+          if (slash <= 0) continue
+          projectName = relative.slice(0, slash)
+        } else {
+          const type = extractBackupType(relative)
+          projectName = type ? `${source.label} · ${type}` : source.label
         }
 
         const project = byProject[projectName] || {
@@ -110,8 +147,8 @@ export default defineEventHandler(async () => {
       continuationToken = result.IsTruncated ? result.NextContinuationToken : undefined
     } while (continuationToken)
   } catch (err) {
-    console.error('Failed to list S3 backups:', err)
-    return { error: `Failed to list backups from S3: ${err instanceof Error ? err.message : String(err)}` }
+    const message = err instanceof Error ? err.message : String(err)
+    return { ...base, error: `Failed to list ${source.bucket}/${source.prefix}: ${message}` }
   }
 
   const projects = Object.values(byProject)
@@ -122,15 +159,19 @@ export default defineEventHandler(async () => {
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  const totalBackups = projects.reduce((sum, project) => sum + project.count, 0)
+  base.projects = projects
+  base.totalProjects = projects.length
+  base.totalBackups = projects.reduce((sum, project) => sum + project.count, 0)
+  return base
+}
+
+export default defineEventHandler(async () => {
+  const sources = await Promise.all(BACKUP_SOURCES.map(listSource))
 
   return {
-    bucket,
-    today: getTodayInTz(BACKUP_TZ),
-    projects,
-    totalProjects: projects.length,
-    totalBackups,
-    listedCount,
+    sources,
+    totalProjects: sources.reduce((sum, source) => sum + source.totalProjects, 0),
+    totalBackups: sources.reduce((sum, source) => sum + source.totalBackups, 0),
     listedAt: new Date().toISOString()
   }
 })
