@@ -1,6 +1,7 @@
-export default defineNuxtRouteMiddleware((to) => {
+export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path === '/login') return
-  if (import.meta.client && localStorage.getItem('app-auth') !== 'true') {
-    return navigateTo('/login')
-  }
+
+  const { loggedIn, fetch: refreshSession } = useUserSession()
+  if (!loggedIn.value) await refreshSession()
+  if (!loggedIn.value) return navigateTo('/login')
 })

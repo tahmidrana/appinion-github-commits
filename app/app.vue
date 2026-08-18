@@ -38,11 +38,12 @@
         >
           KPI Review
         </NuxtLink> -->
+        <span v-if="user" class="ml-auto text-sm text-slate-500">{{ user.id }}</span>
         <button
-          class="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           @click="logout"
         >
-          Lock
+          Logout
         </button>
       </div>
     </nav>
@@ -51,8 +52,10 @@
 </template>
 
 <script setup>
-const logout = () => {
-  localStorage.removeItem('app-auth')
-  navigateTo('/login')
+const { user, clear } = useUserSession()
+
+const logout = async () => {
+  await clear()
+  await navigateTo('/login')
 }
 </script>
