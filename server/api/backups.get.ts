@@ -81,7 +81,7 @@ const listSource = async (source: BackupSource): Promise<SourceResult> => {
   }
 
   if (!accessKeyId || !secretAccessKey) {
-    return { ...base, error: `AWS credentials not configured for ${source.account}` }
+    return { ...base, error: `Credentials not configured for ${source.account}` }
   }
 
   const client = new S3Client({
@@ -149,6 +149,10 @@ const listSource = async (source: BackupSource): Promise<SourceResult> => {
     } while (continuationToken)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    const code = (err as { name?: string, Code?: string })?.name || (err as { Code?: string })?.Code
+    if (code === 'InvalidAccessKeyId' || /access key id you provided does not exist/i.test(message)) {
+      return { ...base, error: 'Access key error' }
+    }
     return { ...base, error: `Failed to list ${bucket}/${source.prefix}: ${message}` }
   }
 

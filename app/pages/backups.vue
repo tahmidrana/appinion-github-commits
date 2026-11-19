@@ -4,7 +4,6 @@
       <section class="rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/70">
         <div class="flex flex-col gap-4 p-4 lg:flex-row lg:items-end lg:justify-between">
           <div class="space-y-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">AWS S3</p>
             <h1 class="text-2xl font-semibold tracking-tight text-slate-950">Backups</h1>
             <p class="text-sm text-slate-600">
               Daily project backups stored, newest first.
@@ -31,6 +30,17 @@
                 <option value="all">All accounts</option>
                 <option value="appinion">Appinion</option>
                 <option value="renata">Renata</option>
+              </select>
+            </label>
+
+            <label v-if="hasData" class="flex min-w-40 flex-col gap-1">
+              <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Status</span>
+              <select
+                v-model="statusFilter"
+                class="h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none ring-0 transition focus:border-sky-500 focus:bg-white"
+              >
+                <option value="all">All projects</option>
+                <option value="missing-today">Missing today</option>
               </select>
             </label>
 
@@ -85,7 +95,7 @@
         >
           <div class="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
             <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
-            Fetching backups from S3...
+            Fetching backups...
           </div>
         </div>
 
@@ -163,6 +173,7 @@
               <span class="min-w-0 flex-1">
                 <span class="flex flex-wrap items-center gap-2">
                   <h2 class="truncate text-base font-semibold text-slate-950">{{ item.project.name }}</h2>
+                  <span class="ml-auto flex flex-wrap items-center justify-end gap-2">
                   <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
                     {{ item.project.count }} {{ item.project.count === 1 ? 'backup' : 'backups' }}
                   </span>
@@ -179,12 +190,6 @@
                     {{ missingBadge(item.project, item.source.today) }}
                   </span>
                   <span
-                    class="rounded-full border px-2 py-0.5 text-[11px] font-medium"
-                    :class="accountBadgeClass(item.source.account)"
-                  >
-                    {{ item.source.label }}
-                  </span>
-                  <span
                     v-if="pruneSuggestion(item.project)"
                     class="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
                     :title="pruneSuggestion(item.project)"
@@ -196,6 +201,7 @@
                     class="rounded-full border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700"
                   >
                     {{ dangerMessage(item.project, item.source.today) }}
+                  </span>
                   </span>
                 </span>
                 <span class="mt-1 block pl-0.5 text-xs text-slate-500">
@@ -294,6 +300,7 @@ const sources = ref([])
 const openProjects = ref([])
 const projectSearch = ref('')
 const accountFilter = ref('all')
+const statusFilter = ref('all')
 const loading = ref(false)
 const errorMessage = ref('')
 const dataStatus = ref('')
@@ -307,7 +314,7 @@ const fetchBackups = async () => {
     if (payload?.error) throw new Error(payload.error)
     sources.value = payload?.sources || []
     hasData.value = true
-    dataStatus.value = `Synced with S3 at ${formatDateTime(payload?.listedAt || '')} · ${sources.value.length} ${sources.value.length === 1 ? 'source' : 'sources'}.`
+    dataStatus.value = `Synced at ${formatDateTime(payload?.listedAt || '')} · ${sources.value.length} ${sources.value.length === 1 ? 'source' : 'sources'}.`
   } catch (err) {
     sources.value = []
     hasData.value = false
@@ -332,9 +339,12 @@ const visibleProjects = computed(() =>
 )
 
 const filteredProjects = computed(() => {
-  if (!projectSearch.value) return visibleProjects.value
   const query = projectSearch.value.toLowerCase()
-  return visibleProjects.value.filter(({ project }) => project.name.toLowerCase().includes(query))
+  return visibleProjects.value.filter(({ project, source }) => {
+    if (query && !project.name.toLowerCase().includes(query)) return false
+    if (statusFilter.value === 'missing-today' && !isMissingToday(project, source.today)) return false
+    return true
+  })
 })
 
 const stats = computed(() => ({
@@ -374,8 +384,18 @@ const dangerMessage = (project, todayValue) => {
   return `No backup in ${days} days`
 }
 
+const isMissingToday = (project, todayValue) => missingRanges(project, todayValue).some((range) => range.includesToday)
+
+const isCritical = (project, todayValue) => {
+  if (project.count < 5) return true
+  const days = daysSinceLastBackup(project, todayValue)
+  return days !== null && days >= 5
+}
+
 const cardClass = (item) => {
   const base = 'overflow-hidden rounded-2xl border bg-white/95 shadow-sm'
+  if (isCritical(item.project, item.source.today)) return 'overflow-hidden rounded-2xl border border-red-300 bg-red-50 shadow-sm shadow-red-100'
+  if (isMissingToday(item.project, item.source.today)) return `${base} border-red-300 shadow-red-100`
   if (dangerMessage(item.project, item.source.today)) return `${base} border-rose-300 shadow-rose-100`
   if (pruneSuggestion(item.project)) return `${base} border-amber-300 shadow-amber-100`
   return `${base} border-slate-200 shadow-slate-200/60`
@@ -401,10 +421,6 @@ const toggleAll = () => {
 }
 
 const allOpen = computed(() => filteredProjects.value.length > 0 && openProjects.value.length === filteredProjects.value.length)
-
-const accountBadgeClass = (account) => account === 'renata'
-  ? 'border-violet-200 bg-violet-100 text-violet-700'
-  : 'border-sky-200 bg-sky-100 text-sky-700'
 
 const projectLatest = (project) => (project.count > 0 ? project.backups[0] : null)
 
